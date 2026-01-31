@@ -80,17 +80,21 @@ class HNRConfig(BaseConfig):
         """校验枚举值"""
         # 处理 notify 字段
         notify_value = values.get("notify")
+        # 如果 notify_value 是 NotifyMode 枚举实例，则转换为字符串
+        if isinstance(notify_value, NotifyMode):
+            notify_value = notify_value.value
         all_values = {member.value for member in NotifyMode}
         if notify_value not in all_values:
             values["notify"] = NotifyMode.ALWAYS
         return values
 
     @validator("*", pre=True, allow_reuse=True)
-    def __empty_string_to_float(cls, v, values, info.info.field):
+    def __empty_string_to_float(cls, v, values, info):
         """
         校验空字符
         """
-        if info.info.field.type_ is float and not v:
+        # 注意：info 是 ValidationInfo 对象，有 field_name 和 field 属性
+        if info.field and info.field.type_ is float and not v:
             return 0.0
         return v
 
@@ -138,6 +142,9 @@ class HNRConfig(BaseConfig):
         yaml = YAML(typ="safe")
         try:
             data = yaml.load(yaml_str)
+            if not isinstance(data, list):
+                logger.error("YAML格式错误，应该是一个列表")
+                return None
             site_configs = {}
             for item in data:
                 site_name = item.get("site_name")
@@ -155,15 +162,17 @@ class HNRConfig(BaseConfig):
         """
         合并站点配置
         """
-        for info.field_name, info.field_info in SiteConfig.__info.fields__.items():
+        # 获取 BaseConfig 中定义的字段名
+        base_fields = BaseConfig.__fields__
+        for field_name, field_info in base_fields.items():
             # 获取当前 site_config 对象中的字段值
-            current_value = getattr(site_config, info.field_name, None)
+            current_value = getattr(site_config, field_name, None)
             # 如果当前字段值为 None，则尝试从 HNRConfig 实例中获取同名字段的默认值
             if current_value is None:
                 # 尝试从 HNRConfig 实例获取默认值，如果不存在则使用 Pydantic 字段的默认值
-                default_value = getattr(self, info.field_name, info.field_info.default)
+                default_value = getattr(self, field_name, field_info.default)
                 # 设置 site_config 对象的字段值
-                setattr(site_config, info.field_name, default_value)
+                setattr(site_config, field_name, default_value)
 
         return site_config
 
@@ -175,6 +184,8 @@ class HNRConfig(BaseConfig):
         if site_config:
             return site_config
         else:
-            # 使用 __info.fields__ 获取所有字段并从实例中获取对应值
-            base_config_attrs = {info.info.field: getattr(self, info.info.field) for info.info.field in self.__info.fields__}
+            # 使用 BaseConfig 的字段列表，从当前实例中获取值
+            base_config_attrs = {}
+            for field_name in BaseConfig.__fields__:
+                base_config_attrs[field_name] = getattr(self, field_name)
             return SiteConfig(**base_config_attrs, site_name=site_name)
