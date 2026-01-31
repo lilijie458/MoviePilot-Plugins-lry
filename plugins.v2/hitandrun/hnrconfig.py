@@ -86,11 +86,11 @@ class HNRConfig(BaseConfig):
         return values
 
     @validator("*", pre=True, allow_reuse=True)
-    def __empty_string_to_float(cls, v, values, info.field):
+    def __empty_string_to_float(cls, v, values, info.info.field):
         """
         校验空字符
         """
-        if info.field.type_ is float and not v:
+        if info.info.field.type_ is float and not v:
             return 0.0
         return v
 
@@ -155,15 +155,15 @@ class HNRConfig(BaseConfig):
         """
         合并站点配置
         """
-        for field_name, field_info in SiteConfig.__fields__.items():
+        for info.field_name, info.field_info in SiteConfig.__info.fields__.items():
             # 获取当前 site_config 对象中的字段值
-            current_value = getattr(site_config, field_name, None)
+            current_value = getattr(site_config, info.field_name, None)
             # 如果当前字段值为 None，则尝试从 HNRConfig 实例中获取同名字段的默认值
             if current_value is None:
                 # 尝试从 HNRConfig 实例获取默认值，如果不存在则使用 Pydantic 字段的默认值
-                default_value = getattr(self, field_name, field_info.default)
+                default_value = getattr(self, info.field_name, info.field_info.default)
                 # 设置 site_config 对象的字段值
-                setattr(site_config, field_name, default_value)
+                setattr(site_config, info.field_name, default_value)
 
         return site_config
 
@@ -175,6 +175,6 @@ class HNRConfig(BaseConfig):
         if site_config:
             return site_config
         else:
-            # 使用 __fields__ 获取所有字段并从实例中获取对应值
-            base_config_attrs = {info.field: getattr(self, info.field) for info.field in self.__fields__}
+            # 使用 __info.fields__ 获取所有字段并从实例中获取对应值
+            base_config_attrs = {info.info.field: getattr(self, info.info.field) for info.info.field in self.__info.fields__}
             return SiteConfig(**base_config_attrs, site_name=site_name)
